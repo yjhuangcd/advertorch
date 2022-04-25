@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 #
 
+# modify predict to compute lyapunov loss
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -36,7 +38,6 @@ def perturb_iterative(xvar, yvar, predict, nb_iter, eps, eps_iter, loss_fn,
     """
     Iteratively maximize the loss over the input. It is a shared method for
     iterative attacks including IterativeGradientSign, LinfPGD, etc.
-
     :param xvar: input data.
     :param yvar: input labels.
     :param predict: forward pass function.
@@ -60,10 +61,11 @@ def perturb_iterative(xvar, yvar, predict, nb_iter, eps, eps_iter, loss_fn,
     else:
         delta = torch.zeros_like(xvar)
 
+    batch_size = xvar.shape[0]
     delta.requires_grad_()
     for ii in range(nb_iter):
-        outputs = predict(xvar + delta)
-        loss = loss_fn(outputs, yvar)
+        outputs = predict(xvar + delta, yvar, batch_size)
+        loss = loss_fn(outputs)
         if minimize:
             loss = -loss
 
@@ -122,7 +124,6 @@ class PGDAttack(Attack, LabelMixin):
     The attack performs nb_iter steps of size eps_iter, while always staying
     within eps from the initial point.
     Paper: https://arxiv.org/pdf/1706.06083.pdf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -141,7 +142,6 @@ class PGDAttack(Attack, LabelMixin):
             ord=np.inf, l1_sparsity=None, targeted=False):
         """
         Create an instance of the PGDAttack.
-
         """
         super(PGDAttack, self).__init__(
             predict, loss_fn, clip_min, clip_max)
@@ -161,7 +161,6 @@ class PGDAttack(Attack, LabelMixin):
         """
         Given examples (x, y), returns their adversarial counterparts with
         an attack length of eps.
-
         :param x: input tensor.
         :param y: label tensor.
                   - if None and self.targeted=False, compute y as predicted
@@ -194,7 +193,6 @@ class PGDAttack(Attack, LabelMixin):
 class LinfPGDAttack(PGDAttack):
     """
     PGD Attack with order=Linf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -221,7 +219,6 @@ class LinfPGDAttack(PGDAttack):
 class L2PGDAttack(PGDAttack):
     """
     PGD Attack with order=L2
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -248,7 +245,6 @@ class L2PGDAttack(PGDAttack):
 class L1PGDAttack(PGDAttack):
     """
     PGD Attack with order=L1
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -275,7 +271,6 @@ class L1PGDAttack(PGDAttack):
 class SparseL1DescentAttack(PGDAttack):
     """
     SparseL1Descent Attack
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -302,7 +297,6 @@ class SparseL1DescentAttack(PGDAttack):
 
 class L2BasicIterativeAttack(PGDAttack):
     """Like GradientAttack but with several steps for each epsilon.
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -328,7 +322,6 @@ class LinfBasicIterativeAttack(PGDAttack):
     Like GradientSignAttack but with several steps for each epsilon.
     Aka Basic Iterative Attack.
     Paper: https://arxiv.org/pdf/1611.01236.pdf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -353,12 +346,10 @@ class LinfBasicIterativeAttack(PGDAttack):
 class MomentumIterativeAttack(Attack, LabelMixin):
     """
     The Momentum Iterative Attack (Dong et al. 2017).
-
     The attack performs nb_iter steps of size eps_iter, while always staying
     within eps from the initial point. The optimization is performed with
     momentum.
     Paper: https://arxiv.org/pdf/1710.06081.pdf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -391,7 +382,6 @@ class MomentumIterativeAttack(Attack, LabelMixin):
         """
         Given examples (x, y), returns their adversarial counterparts with
         an attack length of eps.
-
         :param x: input tensor.
         :param y: label tensor.
                   - if None and self.targeted=False, compute y as predicted
@@ -405,6 +395,7 @@ class MomentumIterativeAttack(Attack, LabelMixin):
         g = torch.zeros_like(x)
 
         delta = nn.Parameter(delta)
+        batch_size = x.shape[0]
 
         for i in range(self.nb_iter):
 
@@ -413,8 +404,8 @@ class MomentumIterativeAttack(Attack, LabelMixin):
                 delta.grad.zero_()
 
             imgadv = x + delta
-            outputs = self.predict(imgadv)
-            loss = self.loss_fn(outputs, y)
+            outputs = self.predict(imgadv, y, batch_size)
+            loss = self.loss_fn(outputs)
             if self.targeted:
                 loss = -loss
             loss.backward()
@@ -433,7 +424,7 @@ class MomentumIterativeAttack(Attack, LabelMixin):
                 delta.data += self.eps_iter * normalize_by_pnorm(g, p=2)
                 delta.data *= clamp(
                     (self.eps * normalize_by_pnorm(delta.data, p=2) /
-                        delta.data),
+                     delta.data),
                     max=1.)
                 delta.data = clamp(
                     x + delta.data, min=self.clip_min, max=self.clip_max) - x
@@ -449,7 +440,6 @@ class L2MomentumIterativeAttack(MomentumIterativeAttack):
     """
     The L2 Momentum Iterative Attack
     Paper: https://arxiv.org/pdf/1710.06081.pdf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -475,7 +465,6 @@ class LinfMomentumIterativeAttack(MomentumIterativeAttack):
     """
     The Linf Momentum Iterative Attack
     Paper: https://arxiv.org/pdf/1710.06081.pdf
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -502,7 +491,6 @@ class FastFeatureAttack(Attack):
     Fast attack against a target internal representation of a model using
     gradient descent (Sabour et al. 2016).
     Paper: https://arxiv.org/abs/1511.05122
-
     :param predict: forward pass function.
     :param loss_fn: loss function.
     :param eps: maximum distortion.
@@ -530,7 +518,6 @@ class FastFeatureAttack(Attack):
         """
         Given source, returns their adversarial counterparts
         with representations close to that of the guide.
-
         :param source: input tensor which we want to perturb.
         :param guide: targeted input.
         :param delta: tensor contains the random initialization.
