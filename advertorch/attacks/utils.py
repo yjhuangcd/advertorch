@@ -47,8 +47,8 @@ def rand_init_delta(delta, x, ord, eps, clip_min, clip_max):
     #   2) uniform sample in the L2 ball, then truncate using the data domain
     # for L1: uniform l1 ball init, then truncate using the data domain
 
-    if isinstance(eps, torch.Tensor):
-        assert len(eps) == len(delta)
+    # if isinstance(eps, torch.Tensor):
+    #     assert len(eps) == len(delta)
 
     if ord == np.inf:
         delta.data.uniform_(-1, 1)

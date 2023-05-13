@@ -169,25 +169,32 @@ def _batch_clamp_tensor_by_vector(vector, batch_tensor):
 
 
 def batch_multiply(float_or_vector, tensor):
-    if isinstance(float_or_vector, torch.Tensor):
-        assert len(float_or_vector) == len(tensor)
-        tensor = _batch_multiply_tensor_by_vector(float_or_vector, tensor)
-    elif isinstance(float_or_vector, float):
-        tensor *= float_or_vector
+    if isinstance(float_or_vector, torch.Tensor) and float_or_vector.ndimension() < tensor.ndimension():
+        tensor *= float_or_vector.unsqueeze(dim=0)
     else:
-        raise TypeError("Value has to be float or torch.Tensor")
+        tensor *= float_or_vector
+    # below does not support different eps for different dimension, seems to support different eps for different samples
+    # if isinstance(float_or_vector, torch.Tensor):
+    #     assert len(float_or_vector) == len(tensor)
+    #     tensor = _batch_multiply_tensor_by_vector(float_or_vector, tensor)
+    # elif isinstance(float_or_vector, float):
+    #     tensor *= float_or_vector
+    # else:
+    #     raise TypeError("Value has to be float or torch.Tensor")
     return tensor
 
 
 def batch_clamp(float_or_vector, tensor):
-    if isinstance(float_or_vector, torch.Tensor):
-        assert len(float_or_vector) == len(tensor)
-        tensor = _batch_clamp_tensor_by_vector(float_or_vector, tensor)
-        return tensor
-    elif isinstance(float_or_vector, float):
-        tensor = clamp(tensor, -float_or_vector, float_or_vector)
-    else:
-        raise TypeError("Value has to be float or torch.Tensor")
+    tensor = clamp(tensor, -float_or_vector, float_or_vector)
+    # below does not support different eps for different dimension, seems to support different eps for different samples
+    # if isinstance(float_or_vector, torch.Tensor):
+    #     assert len(float_or_vector) == len(tensor)
+    #     tensor = _batch_clamp_tensor_by_vector(float_or_vector, tensor)
+    #     return tensor
+    # elif isinstance(float_or_vector, float):
+    #     tensor = clamp(tensor, -float_or_vector, float_or_vector)
+    # else:
+    #     raise TypeError("Value has to be float or torch.Tensor")
     return tensor
 
 
